@@ -6,4 +6,4 @@ float32 temperature
 ---
 sensor_msgs/Image image
 geometry_msgs/Pose[] pose
-DetectionPoint[] point
+DetectionPoint[] pointarray

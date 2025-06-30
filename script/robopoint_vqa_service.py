@@ -3,6 +3,7 @@
 
 import os
 import cv2
+import ast
 import math
 import json
 import rospy
@@ -28,12 +29,12 @@ class RoboPointVQAService:
     def __init__(self):
 
         # v1
-        self.p_model_path = rospy.get_param("~model_path", "wentao-yuan/robopoint-v1-vicuna-v1.5-13b")
-        self.p_model_base = rospy.get_param("~model_base", None)
+        # self.p_model_path = rospy.get_param("~model_path", "wentao-yuan/robopoint-v1-vicuna-v1.5-13b")
+        # self.p_model_base = rospy.get_param("~model_base", None)
 
         # v2
-        # self.p_model_path = rospy.get_param("~model_path", "wentao-yuan/robopoint-v1-vicuna-v1.5-7b-lora")
-        # self.p_model_base = rospy.get_param("~model_base", "lmsys/vicuna-7b-v1.5")
+        self.p_model_path = rospy.get_param("~model_path", "wentao-yuan/robopoint-v1-vicuna-v1.5-7b-lora")
+        self.p_model_base = rospy.get_param("~model_base", "lmsys/vicuna-7b-v1.5")
 
         self.p_conv_mode = rospy.get_param("~conv_mode", "llava_v1")
         self.p_top_p = rospy.get_param("~top_p", 5)
@@ -55,6 +56,26 @@ class RoboPointVQAService:
         """Split a list into n (roughly) equal-sized chunks"""
         chunk_size = math.ceil(len(lst) / n)  # integer division
         return [lst[i:i+chunk_size] for i in range(0, len(lst), chunk_size)]
+
+    @staticmethod
+    def parse_output_string(output_str):
+        """ Parse a string representation of a list of 2D tuples.
+
+        Parameters:
+        - output_str (str): e.g. "[(0.5, 0.4), (0.4, 0.3)]"
+
+        Returns:
+        - list of tuples: [(0.5, 0.4), (0.4, 0.3)]
+        """
+        try:
+            result = ast.literal_eval(output_str)
+            if isinstance(result, list) and all(isinstance(p, tuple) and len(p) == 2 for p in result):
+                return result
+            else:
+                raise ValueError("Parsed result is not a list of 2D tuples.")
+        except Exception as e:
+            print(f"[ERROR] Failed to parse output string: {e}")
+            return []
 
     def imgmsg_to_pil(self, img_msg: Image, desired_encoding='bgr8'):
         """Convert a ROS Image message to a PIL Image."""
@@ -96,6 +117,7 @@ class RoboPointVQAService:
 
         input_ids = tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).cuda()
         pil_image = self.imgmsg_to_pil(req.image)
+        cv_image = self.bridge.imgmsg_to_cv2(req.image, desired_encoding="bgr8")
 
         image_tensor = process_images([pil_image], self.image_processor, self.model.config)[0]
 
@@ -112,10 +134,16 @@ class RoboPointVQAService:
                 use_cache=True)
 
         outputs = self.tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0].strip()
-        rospy.loginfo(f"outputs: {outputs}")
+        outputs_list = self.parse_output_string(outputs)
+        rospy.loginfo(f"outputs: {type(outputs_list)}, {outputs_list}")
+
+        height, width = cv_image.shape[:2]
+        for output in outputs_list:
+            cv2.circle(cv_image, (int(output[0]*width), int(output[1]*height)), 5, (0, 255, 0), -1)
+        cv2.imwrite(os.path.join(self.robopoint_package_dir, "io/test_images/temp_result.png"), cv_image)
 
         response = GetPlacePoseResponse()
-        response.pointarray = outputs
+        # response.pointarray = outputs
 
         return response
 
