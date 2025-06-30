@@ -27,8 +27,14 @@ from robopoint_ros.srv import GetPlacePose, GetPlacePoseResponse, GetPlacePoseRe
 class RoboPointVQAService:
     def __init__(self):
 
+        # v1
         self.p_model_path = rospy.get_param("~model_path", "wentao-yuan/robopoint-v1-vicuna-v1.5-13b")
         self.p_model_base = rospy.get_param("~model_base", None)
+
+        # v2
+        # self.p_model_path = rospy.get_param("~model_path", "wentao-yuan/robopoint-v1-vicuna-v1.5-7b-lora")
+        # self.p_model_base = rospy.get_param("~model_base", "lmsys/vicuna-7b-v1.5")
+
         self.p_conv_mode = rospy.get_param("~conv_mode", "llava_v1")
         self.p_top_p = rospy.get_param("~top_p", 5)
         self.p_num_beams = rospy.get_param("~num_beams", 1)
@@ -89,16 +95,15 @@ class RoboPointVQAService:
         prompt = conv.get_prompt()
 
         input_ids = tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).cuda()
-        image = self.imgmsg_to_pil(req.image)
+        pil_image = self.imgmsg_to_pil(req.image)
 
-        # image = PILImage.open(os.path.join(args.image_folder, image_file)).convert('RGB')
-        image_tensor = process_images([image], self.image_processor, self.model.config)[0]
+        image_tensor = process_images([pil_image], self.image_processor, self.model.config)[0]
 
         with torch.inference_mode():
             output_ids = self.model.generate(
                 input_ids,
                 images=image_tensor.unsqueeze(0).half().cuda(),
-                image_sizes=[image.size],
+                image_sizes=[pil_image.size],
                 do_sample=True if req.temperature > 0 else False,
                 temperature=req.temperature,
                 top_p=self.p_top_p,
