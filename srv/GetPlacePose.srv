@@ -1,0 +1,9 @@
+# GetPlacePose.srv
+sensor_msgs/Image image
+sensor_msgs/Image depth
+string prompt
+float32 temperature
+---
+sensor_msgs/Image image
+geometry_msgs/Pose[] pose
+DetectionPoint[] point
