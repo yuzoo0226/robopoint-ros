@@ -39,11 +39,13 @@ class RoboPointVQAService:
         self.p_conv_mode = rospy.get_param("~conv_mode", "llava_v1")
         self.p_top_p = rospy.get_param("~top_p", 5)
         self.p_num_beams = rospy.get_param("~num_beams", 1)
+        self.p_load_8bit = rospy.get_param("~load_8bit", False)
+        self.p_load_4bit = rospy.get_param("~load_4bit", True)
 
         disable_torch_init()
         self.model_path = os.path.expanduser(self.p_model_path)
         self.model_name = get_model_name_from_path(self.model_path)
-        self.tokenizer, self.model, self.image_processor, self.context_len = load_pretrained_model(self.model_path, self.p_model_base, self.model_name)
+        self.tokenizer, self.model, self.image_processor, self.context_len = load_pretrained_model(self.model_path, self.p_model_base, self.model_name, self.p_load_8bit, self.p_load_4bit)
 
         self.bridge = CvBridge()
 
